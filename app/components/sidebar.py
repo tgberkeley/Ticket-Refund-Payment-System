@@ -57,7 +57,7 @@ def sidebar() -> rx.Component:
                     rx.el.div(
                         sidebar_item("Dashboard", "layout-dashboard", "/"),
                         sidebar_item("Help Tickets", "ticket", "/tickets"),
-                        sidebar_item("Refund Requests", "venus_and_mars", "/refunds"),
+                        sidebar_item("Refund Requests", "rotate-ccw", "/refunds"),
                         sidebar_item("Payments", "credit-card", "/payments"),
                         sidebar_item("AI Assistant", "message-square", "/chat"),
                         class_name="flex flex-col gap-2",

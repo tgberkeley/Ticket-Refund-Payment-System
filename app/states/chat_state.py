@@ -1,11 +1,13 @@
 import reflex as rx
-from typing import Any
 import os
+from typing import Any
 from openai import AsyncOpenAI
 from databricks.sdk import WorkspaceClient
 from app.db import fetch_all
 import logging
 import json
+
+LLM_MODEL = os.environ.get("DATABRICKS_LLM_MODEL", "databricks-claude-sonnet-4-5")
 
 
 class ChatState(rx.State):
@@ -32,7 +34,7 @@ class ChatState(rx.State):
         ]
 
     @rx.event(background=True)
-    async def send_message(self, form_data: dict[str, str]):
+    async def send_message(self, form_data: dict[str, Any]):
         user_msg = form_data.get("message_input", "").strip()
         if not user_msg:
             return
@@ -114,16 +116,29 @@ class ChatState(rx.State):
                 host = f"https://{host}"
             auth_headers = w.config.authenticate()
             token = auth_headers.get("Authorization", "").replace("Bearer ", "")
-            if not token or not host:
-                async with self:
-                    self.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": "Error: Could not authenticate with Databricks. Please check DATABRICKS_HOST and Service Principal credentials.",
-                        }
-                    )
-                    self.loading = False
-                return
+        except Exception as e:
+            logging.exception(f"Databricks auth error: {e}")
+            async with self:
+                self.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": "AI chat requires a Databricks workspace with Foundation Model Serving. "
+                        "Could not authenticate — please check that DATABRICKS_HOST is set and your credentials are configured.",
+                    }
+                )
+                self.loading = False
+            return
+        if not token or not host:
+            async with self:
+                self.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": "Error: Could not authenticate with Databricks. Please check DATABRICKS_HOST and Service Principal credentials.",
+                    }
+                )
+                self.loading = False
+            return
+        try:
             client = AsyncOpenAI(api_key=token, base_url=f"{host}/serving-endpoints")
             api_messages = [{"role": "system", "content": system_prompt}]
             api_messages.extend(
@@ -131,7 +146,7 @@ class ChatState(rx.State):
             )
             response = await client.chat.completions.create(
                 messages=api_messages,
-                model="databricks-meta-llama-3-1-405b-instruct",
+                model=LLM_MODEL,
                 max_tokens=512,
                 temperature=0.5,
                 stream=True,
@@ -149,11 +164,21 @@ class ChatState(rx.State):
                     yield
         except Exception as e:
             logging.exception(f"LLM Error: {e}")
+            error_hint = str(e)
+            if "404" in error_hint or "not found" in error_hint.lower():
+                friendly = (
+                    f"The model endpoint `{LLM_MODEL}` was not found. "
+                    "Make sure Foundation Model Serving is enabled in your Databricks workspace "
+                    "and the model is available. You can override the model name with the "
+                    "DATABRICKS_LLM_MODEL environment variable."
+                )
+            else:
+                friendly = f"I encountered an error connecting to the AI service: {error_hint}"
             async with self:
                 self.messages.append(
                     {
                         "role": "assistant",
-                        "content": f"I encountered an error connecting to the AI service: {str(e)}",
+                        "content": friendly,
                     }
                 )
         finally:

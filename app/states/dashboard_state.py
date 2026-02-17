@@ -26,7 +26,7 @@ class RefundTrendData(TypedDict):
 class SidebarState(rx.State):
     @rx.var
     def current_page(self) -> str:
-        path = self.router.page.path
+        path = self.router.url.path
         return "/" if not path else path
 
 

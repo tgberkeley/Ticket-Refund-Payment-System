@@ -11,11 +11,5 @@ command: [
 env:
   - name: "HOME"
     value: "/tmp/reflex"
-  - name: "DATABRICKS_WAREHOUSE_ID"
-    value: "<your-sql-warehouse-id>"
-  - name: "DATABRICKS_CATALOG"
-    value: "<your-catalog-name>"
-  - name: "DATABRICKS_SCHEMA"
-    value: "<your-schema-name>"
   - name: "REFLEX_SHOW_BUILT_WITH_REFLEX"
     value: 0
